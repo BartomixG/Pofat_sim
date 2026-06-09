@@ -34,7 +34,7 @@ export const DEFAULT_PARAMS: WaveguideParams = {
   sigma: 0,
   amplitude: 1,
   length: 0.08,
-  samples: 15,
+  samples: 61,
   timePhase: 0,
 };
 
@@ -69,10 +69,14 @@ export function calculateWaveguide(
   const kc = Math.hypot(kx, ky);
   const fc = kc / (2 * Math.PI * Math.sqrt(mu * epsilon));
   const propagating = !validationMessage && params.frequency > fc;
-  const beta = propagating ? Math.sqrt(Math.max(0, k * k - kc * kc)) : 0;
+  // Factored differences retain precision close to cutoff, where k and kc
+  // are nearly equal and direct subtraction of their squares is unstable.
+  const beta = propagating
+    ? Math.sqrt(Math.max(0, (k - kc) * (k + kc)))
+    : 0;
   const alpha =
     !validationMessage && !propagating
-      ? Math.sqrt(Math.max(0, kc * kc - k * k))
+      ? Math.sqrt(Math.max(0, (kc - k) * (kc + k)))
       : 0;
   const lambda = k > 0 ? (2 * Math.PI) / k : Number.POSITIVE_INFINITY;
   const lambdaG =

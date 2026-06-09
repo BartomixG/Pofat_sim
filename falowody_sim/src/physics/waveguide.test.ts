@@ -25,6 +25,23 @@ describe("rectangular waveguide physics", () => {
     expect(result.alpha).toBeGreaterThan(0);
   });
 
+  it("keeps propagation constants finite immediately around cutoff", () => {
+    const cutoff = calculateWaveguide(DEFAULT_PARAMS).fc;
+    const above = calculateWaveguide({
+      ...DEFAULT_PARAMS,
+      frequency: cutoff * (1 + 1e-12),
+    });
+    const below = calculateWaveguide({
+      ...DEFAULT_PARAMS,
+      frequency: cutoff * (1 - 1e-12),
+    });
+
+    expect(above.beta).toBeGreaterThan(0);
+    expect(Number.isFinite(above.beta)).toBe(true);
+    expect(below.alpha).toBeGreaterThan(0);
+    expect(Number.isFinite(below.alpha)).toBe(true);
+  });
+
   it("rejects TE00", () => {
     expect(
       validateMode({ ...DEFAULT_PARAMS, mode: "TE", m: 0, n: 0 }),

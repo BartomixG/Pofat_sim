@@ -80,38 +80,50 @@ function drawArrow(
   dx: number,
   dy: number,
   color: string,
-  scale: number,
+  maxLength: number,
+  referenceMagnitude: number,
   outOfPlane = 0,
 ) {
   const projected = Math.hypot(dx, dy);
-  if (projected < 1e-12 && Math.abs(outOfPlane) > 1e-12) {
+  const fullMagnitude = Math.hypot(projected, outOfPlane);
+  if (
+    referenceMagnitude <= 0 ||
+    fullMagnitude < referenceMagnitude * 0.025
+  ) {
+    return;
+  }
+  if (projected < referenceMagnitude * 0.025 && Math.abs(outOfPlane) > 0) {
+    const radius = Math.max(2.8, Math.min(4.2, maxLength * 0.22));
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.arc(x, y, 3.5, 0, 2 * Math.PI);
+    ctx.arc(x, y, radius, 0, 2 * Math.PI);
     ctx.stroke();
     if (outOfPlane > 0) {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(x, y, 1.4, 0, 2 * Math.PI);
+      ctx.arc(x, y, radius * 0.38, 0, 2 * Math.PI);
       ctx.fill();
     } else {
       ctx.beginPath();
-      ctx.moveTo(x - 2.2, y - 2.2);
-      ctx.lineTo(x + 2.2, y + 2.2);
-      ctx.moveTo(x + 2.2, y - 2.2);
-      ctx.lineTo(x - 2.2, y + 2.2);
+      ctx.moveTo(x - radius * 0.62, y - radius * 0.62);
+      ctx.lineTo(x + radius * 0.62, y + radius * 0.62);
+      ctx.moveTo(x + radius * 0.62, y - radius * 0.62);
+      ctx.lineTo(x - radius * 0.62, y + radius * 0.62);
       ctx.stroke();
     }
     return;
   }
-  if (projected < 1e-12) return;
+  if (projected <= 0) return;
 
   const ux = dx / projected;
   const uy = dy / projected;
-  const length = Math.min(18, 4 + scale * projected);
+  const normalized = Math.min(1, fullMagnitude / referenceMagnitude);
+  const length = maxLength * (0.28 + 0.72 * normalized);
   const ex = x + ux * length;
   const ey = y + uy * length;
+  const headLength = Math.min(4.2, Math.max(2.8, length * 0.32));
+  const headWidth = headLength * 0.58;
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineWidth = 1.45;
@@ -121,8 +133,14 @@ function drawArrow(
   ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(ex, ey);
-  ctx.lineTo(ex - ux * 4 - uy * 2.4, ey - uy * 4 + ux * 2.4);
-  ctx.lineTo(ex - ux * 4 + uy * 2.4, ey - uy * 4 - ux * 2.4);
+  ctx.lineTo(
+    ex - ux * headLength - uy * headWidth,
+    ey - uy * headLength + ux * headWidth,
+  );
+  ctx.lineTo(
+    ex - ux * headLength + uy * headWidth,
+    ey - uy * headLength - ux * headWidth,
+  );
   ctx.closePath();
   ctx.fill();
 }
@@ -165,8 +183,19 @@ export function FieldCanvas({
     ctx.fillStyle = "#0d1624";
     ctx.fillRect(0, 0, width, height);
 
-    const nU = Math.max(10, Math.min(params.samples, 31));
-    const nV = Math.max(8, Math.round(nU * 0.7));
+    const nU = Math.max(10, Math.min(params.samples, 201));
+    const nV = Math.max(
+      8,
+      Math.min(
+        161,
+        Math.round(
+          nU *
+            (plane === "xy"
+              ? Math.min(1, params.b / params.a)
+              : 0.7),
+        ),
+      ),
+    );
     const points: {
       x: number;
       y: number;
@@ -212,10 +241,37 @@ export function FieldCanvas({
       );
     }
 
-    const vectorPoints = points.filter(
-      (_, index) =>
-        index % Math.max(1, Math.floor(nU / 7)) === 0 &&
-        Math.floor(index / nU) % Math.max(1, Math.floor(nV / 5)) === 0,
+    const transverseOrderU =
+      plane === "xy" ? params.m : plane === "xz" ? 0 : 0;
+    const transverseOrderV =
+      plane === "xy" ? params.n : plane === "xz" ? params.m : params.n;
+    const vectorCountU =
+      plane === "xy"
+        ? Math.max(7, Math.min(13, 2 * transverseOrderU + 5))
+        : 9;
+    const vectorCountV = Math.max(
+      5,
+      Math.min(11, 2 * transverseOrderV + 5),
+    );
+    const vectorPoints = [];
+    for (let j = 0; j < vectorCountV; j += 1) {
+      for (let i = 0; i < vectorCountU; i += 1) {
+        const u = (i + 0.5) / vectorCountU;
+        const v = (j + 0.5) / vectorCountV;
+        const x =
+          plane === "xy" ? u * params.a : plane === "xz" ? v * params.a : slice.x;
+        const y =
+          plane === "xy" ? (1 - v) * params.b : plane === "yz" ? (1 - v) * params.b : slice.y;
+        const z = plane === "xy" ? slice.z : u * params.length;
+        vectorPoints.push({ x, y, z, u, v });
+      }
+    }
+    const maxArrowLength = Math.max(
+      6,
+      Math.min(
+        18,
+        0.38 * Math.min(plotW / vectorCountU, plotH / vectorCountV),
+      ),
     );
     const vectorLayers = [
       ["E", layers.E],
@@ -227,17 +283,20 @@ export function FieldCanvas({
 
     for (const [key, enabled] of vectorLayers) {
       if (!enabled || !results.valid) continue;
-      const values = vectorPoints.map((point) => {
-        const sample = sampleFields(
+      const values = vectorPoints.map((point) => ({
+        point,
+        vector: sampleFields(
           params,
           results,
           point.x,
           point.y,
           point.z,
-        );
-        return { point, vector: sample[key] };
-      });
-      const layerMax = Math.max(...values.map(({ vector }) => magnitude(vector)), 0);
+        )[key],
+      }));
+      const layerMax = Math.max(
+        ...values.map(({ vector }) => magnitude(vector)),
+        0,
+      );
       if (layerMax === 0) continue;
       for (const { point, vector } of values) {
         const [du, dv, out] = projectVector(plane, vector);
@@ -248,7 +307,8 @@ export function FieldCanvas({
           du,
           dv,
           COLORS[key],
-          13 / layerMax,
+          maxArrowLength,
+          layerMax,
           out,
         );
       }
@@ -273,7 +333,8 @@ export function FieldCanvas({
           du,
           dv,
           COLORS.Js,
-          10 / amp,
+          10,
+          amp,
           out,
         );
       };

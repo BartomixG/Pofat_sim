@@ -223,11 +223,11 @@ export function Controls({
           label="Próbki siatki"
           title="Gęstość siatki wizualizacji. Wyższa wartość zwiększa koszt renderowania."
           value={params.samples}
-          step={1}
+          step={10}
           min={7}
-          max={31}
+          max={201}
           onChange={(samples) =>
-            patch({ samples: Math.max(7, Math.min(31, Math.round(samples))) })
+            patch({ samples: Math.max(7, Math.min(201, Math.round(samples))) })
           }
         />
       </section>

@@ -25,26 +25,37 @@ function Arrow({
   vector,
   color,
   scale,
+  maxLength,
 }: {
   position: [number, number, number];
   vector: Vector3Value;
   color: string;
   scale: number;
+  maxLength: number;
 }) {
   const object = useMemo(() => {
     const direction = new THREE.Vector3(vector.x, vector.y, vector.z);
     const rawLength = direction.length();
     if (rawLength < 1e-30) return null;
     direction.normalize();
+    const length = Math.min(maxLength, maxLength * 0.24 + rawLength * scale);
     return new THREE.ArrowHelper(
       direction,
       new THREE.Vector3(...position),
-      Math.min(0.45, 0.08 + rawLength * scale),
+      length,
       color,
-      0.09,
-      0.045,
+      Math.min(0.075, length * 0.28),
+      Math.min(0.04, length * 0.16),
     );
-  }, [color, position, scale, vector.x, vector.y, vector.z]);
+  }, [
+    color,
+    maxLength,
+    position,
+    scale,
+    vector.x,
+    vector.y,
+    vector.z,
+  ]);
 
   return object ? <primitive object={object} /> : null;
 }
@@ -67,12 +78,21 @@ function Scene({
       (y / params.b - 0.5) * sy,
       (z / params.length - 0.5) * sz,
     ] as [number, number, number];
+  const toSceneVector = (vector: Vector3Value): Vector3Value => ({
+    x: (vector.x * sx) / params.a,
+    y: (vector.y * sy) / params.b,
+    z: (vector.z * sz) / params.length,
+  });
 
   const volumeSamples = useMemo(() => {
     const values = [];
-    const nx = 4;
-    const ny = 3;
-    const nz = 7;
+    const nx = Math.max(5, Math.min(9, 2 * params.m + 5));
+    const ny = Math.max(4, Math.min(9, 2 * params.n + 5));
+    const guidePeriods =
+      results.propagating && Number.isFinite(results.lambdaG)
+        ? params.length / results.lambdaG
+        : 0;
+    const nz = Math.max(7, Math.min(13, Math.ceil(guidePeriods * 6) + 5));
     for (let iz = 0; iz < nz; iz += 1) {
       for (let iy = 0; iy < ny; iy += 1) {
         for (let ix = 0; ix < nx; ix += 1) {
@@ -86,7 +106,7 @@ function Scene({
         }
       }
     }
-    return values;
+    return { values, nx, ny, nz };
   }, [params, results]);
 
   const maxima = useMemo(() => {
@@ -94,10 +114,27 @@ function Scene({
     return Object.fromEntries(
       keys.map((key) => [
         key,
-        Math.max(...volumeSamples.map((sample) => magnitude(sample.fields[key])), 1e-30),
+        Math.max(
+          ...volumeSamples.values.map((sample) =>
+            magnitude(toSceneVector(sample.fields[key])),
+          ),
+          1e-30,
+        ),
       ]),
     ) as Record<(typeof keys)[number], number>;
   }, [volumeSamples]);
+  const volumeArrowLength = Math.max(
+    0.16,
+    Math.min(
+      0.38,
+      0.72 *
+        Math.min(
+          sx / volumeSamples.nx,
+          sy / volumeSamples.ny,
+          sz / volumeSamples.nz,
+        ),
+    ),
+  );
 
   const surfaceSamples = useMemo(() => {
     const samples: {
@@ -129,10 +166,11 @@ function Scene({
     return samples;
   }, [params, results]);
   const jsMax = Math.max(
-    ...surfaceSamples.map((sample) => magnitude(sample.vector)),
+    ...surfaceSamples.map((sample) =>
+      magnitude(toSceneVector(sample.vector)),
+    ),
     1e-30,
   );
-
   const box = useMemo(
     () => new THREE.BoxGeometry(sx, sy, sz),
     [sx, sy, sz],
@@ -158,18 +196,25 @@ function Scene({
       </lineSegments>
 
       {results.valid &&
-        volumeSamples.map((sample, index) =>
+        volumeSamples.values.map((sample, index) =>
           (["E", "H", "Jd", "Jsigma", "S"] as const).map((key) => {
             const enabled =
               layers[key] && !(key === "Jsigma" && params.sigma === 0);
-            if (!enabled) return null;
+            if (
+              !enabled ||
+              magnitude(toSceneVector(sample.fields[key])) <
+                maxima[key] * 0.025
+            ) {
+              return null;
+            }
             return (
               <Arrow
                 key={`${key}-${index}`}
                 position={sample.position}
-                vector={sample.fields[key]}
+                vector={toSceneVector(sample.fields[key])}
                 color={COLORS[key]}
-                scale={0.28 / maxima[key]}
+                scale={(volumeArrowLength * 0.76) / maxima[key]}
+                maxLength={volumeArrowLength}
               />
             );
           }),
@@ -181,9 +226,10 @@ function Scene({
           <Arrow
             key={`js-${index}`}
             position={sample.position}
-            vector={sample.vector}
+            vector={toSceneVector(sample.vector)}
             color={COLORS.Js}
-            scale={0.25 / jsMax}
+            scale={0.2 / jsMax}
+            maxLength={0.3}
           />
         ))}
 

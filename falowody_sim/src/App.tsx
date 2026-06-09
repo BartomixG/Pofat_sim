@@ -24,14 +24,17 @@ const DEFAULT_LAYERS: LayerVisibility = {
   S: false,
 };
 
+const readableSlice = (size: number, order: number) =>
+  order > 0 ? size / (4 * order) : size / 2;
+
 export default function App() {
   const [params, setParams] = useState<WaveguideParams>(DEFAULT_PARAMS);
   const [layers, setLayers] = useState(DEFAULT_LAYERS);
   const [plane, setPlane] = useState<Plane>("xy");
   const [scalar, setScalar] = useState<ScalarField>("E");
   const [slice, setSlice] = useState({
-    x: DEFAULT_PARAMS.a / 2,
-    y: DEFAULT_PARAMS.b / 2,
+    x: readableSlice(DEFAULT_PARAMS.a, DEFAULT_PARAMS.m),
+    y: readableSlice(DEFAULT_PARAMS.b, DEFAULT_PARAMS.n),
     z: 0,
   });
   const [animate, setAnimate] = useState(false);
@@ -39,11 +42,11 @@ export default function App() {
 
   useEffect(() => {
     setSlice((current) => ({
-      x: Math.min(current.x, params.a),
-      y: Math.min(current.y, params.b),
+      x: readableSlice(params.a, params.m),
+      y: readableSlice(params.b, params.n),
       z: Math.min(current.z, params.length),
     }));
-  }, [params.a, params.b, params.length]);
+  }, [params.a, params.b, params.length, params.m, params.n]);
 
   useEffect(() => {
     if (!animate) return;
