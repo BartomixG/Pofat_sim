@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fala EM na granicy ośrodków - CW4, zadanie 1</title>
+  <link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">POFAT · CW4 · zadanie 1</p>
+      <h1>Fala elektromagnetyczna na granicy ośrodków</h1>
+      <p class="lead">Zobacz falę padającą, odbitą i transmitowaną oraz wynikowy rozkład pól E, H, D i B.</p>
+    </div>
+    <div class="boundary-mini" aria-hidden="true">
+      <span>ośrodek 1</span><i></i><span>ośrodek 2</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="simulation-settings">
+      <div class="settings-heading">
+        <div><p class="eyebrow">Dane wejściowe symulacji</p><h2>Zmień właściwości ośrodków i fali</h2></div>
+        <button id="resetParameters">Przywróć zadanie 1</button>
+      </div>
+      <div class="parameter-grid">
+        <fieldset><legend>Ośrodek 1 · z &lt; 0</legend><label>ε<sub>r1</sub><input id="er1" type="number" min="0.001" step="0.1" value="8"></label><label>μ<sub>r1</sub><input id="mr1" type="number" min="0.001" step="0.1" value="2"></label></fieldset>
+        <fieldset><legend>Ośrodek 2 · z &gt; 0</legend><label>ε<sub>r2</sub><input id="er2" type="number" min="0.001" step="0.1" value="36"></label><label>μ<sub>r2</sub><input id="mr2" type="number" min="0.001" step="0.1" value="4"></label></fieldset>
+        <fieldset><legend>Fala padająca</legend><label>f [GHz]<input id="frequency" type="number" min="0.001" step="0.1" value="1"></label><label>S<sub>avg</sub> [W/m²]<input id="powerDensity" type="number" min="0.000001" step="0.1" value="1"></label></fieldset>
+      </div>
+      <p id="parameterError" class="parameter-error" role="alert"></p>
+    </section>
+
+    <section class="control-panel">
+      <div class="field-tabs" role="tablist" aria-label="Wybór pola">
+        <button class="field-tab active" data-field="E">E <small>V/m</small></button>
+        <button class="field-tab" data-field="H">H <small>A/m</small></button>
+        <button class="field-tab" data-field="D">D <small>C/m²</small></button>
+        <button class="field-tab" data-field="B">B <small>T</small></button>
+      </div>
+
+      <div class="transport">
+        <button id="playPause" class="primary">Pauza</button>
+        <button id="stepBack" title="Cofnij o 1/16 okresu">−Δt</button>
+        <button id="stepForward" title="Przesuń o 1/16 okresu">+Δt</button>
+        <label>
+          Faza czasu
+          <input id="timeSlider" type="range" min="0" max="1" step="0.001" value="0">
+          <output id="phaseOutput">0.00 T</output>
+        </label>
+        <label class="speed">
+          Tempo
+          <select id="speed">
+            <option value="0.1">0,1×</option>
+            <option value="0.2" selected>0,2×</option>
+            <option value="0.5">0,5×</option>
+            <option value="1">1×</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="toggles">
+        <label><input id="showIncident" type="checkbox" checked> padająca</label>
+        <label><input id="showReflected" type="checkbox" checked> odbita</label>
+        <label><input id="showTransmitted" type="checkbox" checked> transmitowana</label>
+        <label><input id="showTotal" type="checkbox" checked> suma fizyczna</label>
+        <label><input id="showEnvelope" type="checkbox"> obwiednia amplitudy</label>
+        <label><input id="normalize" type="checkbox" checked> wspólna skala względna</label>
+      </div>
+    </section>
+
+    <section class="visual-card">
+      <div class="canvas-heading">
+        <div>
+          <p class="eyebrow">Widok chwilowy</p>
+          <h2 id="fieldTitle">Pole elektryczne E<sub>x</sub>(z,t)</h2>
+        </div>
+        <div class="canvas-tools">
+          <div class="legend">
+            <span><i class="incident"></i> padająca</span>
+            <span><i class="reflected"></i> odbita</span>
+            <span><i class="transmitted"></i> transmitowana</span>
+            <span><i class="total"></i> suma</span>
+            <span><i class="envelope"></i> obwiednia</span>
+          </div>
+          <div class="zoom-controls" aria-label="Powiększenie pionowe wykresu">
+            <button id="zoomOut" type="button" title="Oddal wykres">−</button>
+            <label>
+              Skala
+              <input id="verticalZoom" type="range" min="25" max="400" step="25" value="100">
+              <output id="zoomOutput">100%</output>
+            </label>
+            <button id="zoomIn" type="button" title="Przybliż wykres">+</button>
+            <button id="zoomReset" type="button">Dopasuj</button>
+          </div>
+        </div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="waveCanvas" width="1400" height="650"></canvas>
+      </div>
+      <p id="canvasHint" class="canvas-hint"></p>
+    </section>
+
+    <section class="explanation-grid">
+      <article class="explanation">
+        <p class="eyebrow">Co teraz oglądasz?</p>
+        <h2 id="explanationTitle">E jest styczne do granicy</h2>
+        <p id="explanationText"></p>
+        <div id="boundaryEquation" class="equation"></div>
+      </article>
+
+      <article class="numbers">
+        <p class="eyebrow">Amplitudy szczytowe</p>
+        <h2 id="numbersTitle">Pole E</h2>
+        <dl id="amplitudes"></dl>
+      </article>
+    </section>
+
+    <section class="physics-card">
+      <div>
+        <p class="eyebrow">Parametry zadania</p>
+        <h2>Dwa bezstratne ośrodki, granica z = 0</h2>
+      </div>
+      <div class="media">
+        <article>
+          <h3>Ośrodek 1 · z &lt; 0</h3>
+          <p id="medium1Summary"></p>
+        </article>
+        <div class="boundary-label">z = 0</div>
+        <article>
+          <h3>Ośrodek 2 · z &gt; 0</h3>
+          <p id="medium2Summary"></p>
+        </article>
+      </div>
+      <div id="coefficients" class="coefficients"></div>
+    </section>
+
+    <section class="all-parameters">
+      <div><p class="eyebrow">Pełne wyniki</p><h2>Wszystkie parametry symulacji</h2></div>
+      <div id="parameterTables" class="parameter-tables"></div>
+    </section>
+
+    <section class="reading-guide">
+      <p class="eyebrow">Jak czytać animację</p>
+      <h2>Trzy rzeczy, których wykres nie może ukryć</h2>
+      <div class="guide-grid">
+        <article>
+          <b>1. Kierunek ruchu</b>
+          <p>Faza fali padającej i transmitowanej przesuwa się ku +z. Faza fali odbitej wraca ku −z.</p>
+        </article>
+        <article>
+          <b>2. Suma w ośrodku 1</b>
+          <p>Po lewej istnieją jednocześnie dwie fale. Gruba biała krzywa jest ich rzeczywistą sumą chwilową.</p>
+        </article>
+        <article>
+          <b>3. Obwiednia</b>
+          <p id="envelopeGuide"></p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer id="footerText">Model harmoniczny. Oś z jest skompresowana względem rzeczywistej skali czasu.</footer>
+  <script src="app.js?v=2"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+services:
+  wave-transformer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wave-transformer-sandbox:local
+    ports:
+      - "${APP_PORT:-5173}:80"
+    restart: unless-stopped

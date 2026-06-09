@@ -1,0 +1,7 @@
+services:
+  wave-boundary-viz:
+    build: .
+    container_name: pofat-wave-boundary-viz
+    restart: unless-stopped
+    ports:
+      - "4173:80"

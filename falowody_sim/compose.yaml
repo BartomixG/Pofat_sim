@@ -1,0 +1,8 @@
+services:
+  waveguide-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT:-8091}:80"
+    restart: unless-stopped
